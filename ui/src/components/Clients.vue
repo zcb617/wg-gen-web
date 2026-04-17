@@ -527,13 +527,21 @@
       }),
 
       startCreate() {
-        // Build default allowed IPs: public CIDR blocks + server IPv4 /32
-        let allowedIPs = [...this.defaultAllowedIPs];
+        // Use server-configured allowedips as default, fallback to built-in list
+        let allowedIPs = [];
+        if (this.server.allowedips && this.server.allowedips.length > 0) {
+          allowedIPs = [...this.server.allowedips];
+        } else {
+          allowedIPs = [...this.defaultAllowedIPs];
+        }
+        // Append server IPv4 /32 if not already present
         if (this.server.address && this.server.address.length > 0) {
           this.server.address.forEach(addr => {
             if (addr.includes('.')) {
-              const ip = addr.split('/')[0];
-              allowedIPs.push(ip + '/32');
+              const ip = addr.split('/')[0] + '/32';
+              if (!allowedIPs.includes(ip)) {
+                allowedIPs.push(ip);
+              }
             }
           });
         }
