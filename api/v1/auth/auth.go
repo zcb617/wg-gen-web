@@ -5,10 +5,12 @@ import (
 	"github.com/patrickmn/go-cache"
 	log "github.com/sirupsen/logrus"
 	"github.com/vx3r/wg-gen-web/auth"
+	"github.com/vx3r/wg-gen-web/auth/file"
 	"github.com/vx3r/wg-gen-web/model"
 	"github.com/vx3r/wg-gen-web/util"
 	"golang.org/x/oauth2"
 	"net/http"
+	"os"
 	"time"
 )
 
@@ -18,6 +20,7 @@ func ApplyRoutes(r *gin.RouterGroup) {
 	{
 		g.GET("/oauth2_url", oauth2URL)
 		g.POST("/oauth2_exchange", oauth2Exchange)
+		g.POST("/login", login)
 		g.GET("/user", user)
 		g.GET("/logout", logout)
 	}
@@ -92,6 +95,76 @@ func oauth2Exchange(c *gin.Context) {
 		}).Error("failed to exchange code for token")
 		c.AbortWithStatus(http.StatusBadRequest)
 		return
+	}
+
+	cacheDb.Delete(loginVals.ClientId)
+	cacheDb.Set(oauth2Token.AccessToken, oauth2Token, cache.DefaultExpiration)
+
+	c.JSON(http.StatusOK, oauth2Token.AccessToken)
+}
+
+func login(c *gin.Context) {
+	var loginVals struct {
+		Username string `json:"username" binding:"required"`
+		Password string `json:"password" binding:"required"`
+		ClientId string `json:"clientId"`
+		State    string `json:"state"`
+	}
+	if err := c.ShouldBind(&loginVals); err != nil {
+		log.WithFields(log.Fields{
+			"err": err,
+		}).Error("username and password fields are missing")
+		c.AbortWithStatus(http.StatusUnprocessableEntity)
+		return
+	}
+
+	cacheDb := c.MustGet("cache").(*cache.Cache)
+
+	// Validate state if provided
+	if loginVals.ClientId != "" && loginVals.State != "" {
+		savedState, exists := cacheDb.Get(loginVals.ClientId)
+		if !exists || savedState != loginVals.State {
+			log.WithFields(log.Fields{
+				"state":      loginVals.State,
+				"savedState": savedState,
+			}).Error("saved state and client provided state mismatch")
+			c.AbortWithStatus(http.StatusBadRequest)
+			return
+		}
+	}
+
+	// Validate credentials using file auth provider
+	authProvider := c.MustGet("oauth2Client").(auth.Auth)
+	fileProvider, ok := authProvider.(*file.File)
+	if !ok {
+		log.Error("login endpoint only works with file auth provider")
+		c.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+
+	if !fileProvider.Validate(loginVals.Username, loginVals.Password) {
+		log.WithFields(log.Fields{
+			"username": loginVals.Username,
+		}).Error("invalid username or password")
+		c.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+
+	// Generate token
+	rand, err := util.GenerateRandomString(32)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"err": err,
+		}).Error("failed to generate token")
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+
+	oauth2Token := &oauth2.Token{
+		AccessToken:  rand,
+		TokenType:    "",
+		RefreshToken: "",
+		Expiry:       time.Time{},
 	}
 
 	cacheDb.Delete(loginVals.ClientId)

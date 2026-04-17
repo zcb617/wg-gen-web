@@ -12,6 +12,39 @@
 
       <Footer/>
     </div>
+    <div v-else-if="this.showLoginForm" class="login-container">
+      <v-card class="login-card" max-width="400">
+        <v-card-title class="headline">WireGuard Login</v-card-title>
+        <v-card-text>
+          <v-form ref="loginForm" v-model="loginValid">
+            <v-text-field
+              v-model="loginUsername"
+              label="Username"
+              :rules="[v => !!v || 'Username is required']"
+              required
+            />
+            <v-text-field
+              v-model="loginPassword"
+              label="Password"
+              type="password"
+              :rules="[v => !!v || 'Password is required']"
+              required
+              @keyup.enter="doLogin"
+            />
+          </v-form>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer/>
+          <v-btn
+            color="success"
+            :disabled="!loginValid"
+            @click="doLogin"
+          >
+            Login
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </div>
   </v-app>
 </template>
 
@@ -36,6 +69,9 @@
         color: '',
         text: '',
       },
+      loginValid: false,
+      loginUsername: '',
+      loginPassword: '',
     }),
 
     computed:{
@@ -46,7 +82,10 @@
         authError: 'auth/error',
         clientError: 'client/error',
         serverError: 'server/error',
-      })
+      }),
+      showLoginForm() {
+        return this.authStatus === 'login';
+      }
     },
 
     created () {
@@ -99,13 +138,33 @@
       ...mapActions('auth', {
         oauth2_exchange: 'oauth2_exchange',
         oauth2_url: 'oauth2_url',
+        login: 'login',
       }),
 
       notify(color, msg) {
         this.notification.show = true;
         this.notification.color = color;
         this.notification.text = msg;
+      },
+
+      doLogin() {
+        this.login({
+          username: this.loginUsername,
+          password: this.loginPassword,
+        });
       }
     }
   };
 </script>
+
+<style>
+.login-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+}
+.login-card {
+  width: 100%;
+}
+</style>

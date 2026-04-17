@@ -4,6 +4,7 @@ import (
 	"fmt"
 	log "github.com/sirupsen/logrus"
 	"github.com/vx3r/wg-gen-web/auth/fake"
+	"github.com/vx3r/wg-gen-web/auth/file"
 	"github.com/vx3r/wg-gen-web/auth/github"
 	"github.com/vx3r/wg-gen-web/auth/oauth2oidc"
 	"github.com/vx3r/wg-gen-web/model"
@@ -28,6 +29,10 @@ func GetAuthProvider() (Auth, error) {
 	case "fake":
 		log.Warn("Oauth is set to fake, no actual authentication will be performed")
 		oauth2Client = &fake.Fake{}
+
+	case "file":
+		log.Info("Oauth is set to file, using local users.txt for authentication")
+		oauth2Client = &file.File{}
 
 	case "oauth2oidc":
 		log.Warn("Oauth is set to oauth2oidc, must be RFC implementation on server side")

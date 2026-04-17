@@ -51,6 +51,10 @@ const actions = {
           commit('authStatus', 'disabled')
           TokenService.saveClientId(resp.clientId)
           dispatch('oauth2_exchange', {code: "", state: resp.state})
+        } else if (resp.codeUrl === '_magic_string_file_auth_login_form_'){
+          console.log("server report file auth, show login form")
+          commit('authStatus', 'login')
+          TokenService.saveClientId(resp.clientId)
         } else {
           commit('authStatus', 'redirect')
           commit('authRedirectUrl', resp)
@@ -66,6 +70,21 @@ const actions = {
   oauth2_exchange({ commit, dispatch }, data){
     data.clientId = TokenService.getClientId()
     ApiService.post("/auth/oauth2_exchange", data)
+      .then(resp => {
+        commit('authStatus', 'success')
+        commit('token', resp)
+        dispatch('user');
+      })
+      .catch(err => {
+        commit('authStatus', 'error')
+        commit('error', err);
+        commit('logout')
+      })
+  },
+
+  login({ commit, dispatch }, data){
+    data.clientId = TokenService.getClientId()
+    ApiService.post("/auth/login", data)
       .then(resp => {
         commit('authStatus', 'success')
         commit('token', resp)
@@ -112,6 +131,8 @@ const mutations = {
   },
   logout(state) {
     state.user = null;
+    state.authStatus = '';
+    state.authRedirectUrl = '';
     TokenService.destroyToken();
     TokenService.destroyClientId();
   }
