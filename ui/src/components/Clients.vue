@@ -258,7 +258,9 @@
                                 />
                                 <v-select
                                         v-model="client.address"
-                                        :items="server.address"
+                                        :items="server.address.map(a => ({ text: a.replace(/(\d+\.\d+\.\d+)\.1(\/\d+)/, '$1.0$2') + ' (auto-assign)', value: a }))"
+                                        item-text="text"
+                                        item-value="value"
                                         label="Client IP will be chosen from these networks"
                                         :rules="[ v => !!v || 'Network is required', ]"
                                         multiple
@@ -485,6 +487,15 @@
         { text: 'Actions', value: 'action', sortable: false, },
 
       ],
+      defaultAllowedIPs: [
+        "1.0.0.0/8", "2.0.0.0/8", "3.0.0.0/8", "4.0.0.0/6", "8.0.0.0/7",
+        "11.0.0.0/8", "12.0.0.0/6", "16.0.0.0/4", "32.0.0.0/3", "64.0.0.0/2",
+        "128.0.0.0/3", "160.0.0.0/5", "168.0.0.0/6", "172.0.0.0/12", "172.32.0.0/11",
+        "172.64.0.0/10", "172.128.0.0/9", "173.0.0.0/8", "174.0.0.0/7", "176.0.0.0/4",
+        "192.0.0.0/9", "192.128.0.0/11", "192.160.0.0/13", "192.169.0.0/16",
+        "192.170.0.0/15", "192.172.0.0/14", "192.176.0.0/12", "192.192.0.0/10",
+        "193.0.0.0/8", "194.0.0.0/7", "196.0.0.0/6", "200.0.0.0/5", "208.0.0.0/4",
+      ],
     }),
 
     computed:{
@@ -516,11 +527,21 @@
       }),
 
       startCreate() {
+        // Build default allowed IPs: public CIDR blocks + server IPv4 /32
+        let allowedIPs = [...this.defaultAllowedIPs];
+        if (this.server.address && this.server.address.length > 0) {
+          this.server.address.forEach(addr => {
+            if (addr.includes('.')) {
+              const ip = addr.split('/')[0];
+              allowedIPs.push(ip + '/32');
+            }
+          });
+        }
         this.client = {
           name: "",
           email: "",
           enable: true,
-          allowedIPs: this.server.allowedips,
+          allowedIPs: allowedIPs,
           address: this.server.address,
           tags: [],
         }
