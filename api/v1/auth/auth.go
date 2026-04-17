@@ -10,7 +10,6 @@ import (
 	"github.com/vx3r/wg-gen-web/util"
 	"golang.org/x/oauth2"
 	"net/http"
-	"os"
 	"time"
 )
 
