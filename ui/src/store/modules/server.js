@@ -5,6 +5,7 @@ const state = {
   server: null,
   config: '',
   version: '_ci_build_not_run_properly_',
+  dnscrypt: null,
 }
 
 const getters = {
@@ -22,6 +23,10 @@ const getters = {
 
   config(state) {
     return state.config;
+  },
+
+  dnscrypt(state) {
+    return state.dnscrypt;
   },
 }
 
@@ -71,6 +76,16 @@ const actions = {
       })
   },
 
+  dnscrypt({ commit }){
+    ApiService.get("/server/dnscrypt")
+      .then(resp => {
+        commit('dnscrypt', resp)
+      })
+      .catch(err => {
+        commit('dnscrypt', { enabled: false })
+      })
+  },
+
 }
 
 const mutations = {
@@ -88,6 +103,10 @@ const mutations = {
 
   version(state, version){
     state.version = version
+  },
+
+  dnscrypt(state, dnscrypt){
+    state.dnscrypt = dnscrypt
   },
 }
 

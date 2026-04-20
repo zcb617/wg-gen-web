@@ -155,6 +155,41 @@
                 </v-card>
             </v-col>
         </v-row>
+        <v-row v-if="dnscrypt && dnscrypt.enabled">
+            <v-col cols="12">
+                <v-card dark>
+                    <v-card-title>
+                        DNSCrypt configuration
+                    </v-card-title>
+                    <div class="d-flex flex-no-wrap justify-space-between">
+                        <v-col cols="12">
+                            <v-text-field
+                                    v-model="dnscrypt.providerName"
+                                    label="Provider name"
+                                    disabled
+                            />
+                            <v-text-field
+                                    v-model="dnscrypt.publicKey"
+                                    label="Provider public key"
+                                    disabled
+                            />
+                            <v-textarea
+                                    v-model="dnscrypt.stamp"
+                                    label="DNS Stamp"
+                                    rows="2"
+                                    readonly
+                                    auto-grow
+                                    append-icon="mdi-content-copy"
+                                    @click:append="copyStamp"
+                            />
+                            <v-alert v-if="stampCopied" type="success" dense>
+                                DNS Stamp copied to clipboard
+                            </v-alert>
+                        </v-col>
+                    </div>
+                </v-card>
+            </v-col>
+        </v-row>
         <v-row>
             <v-divider dark/>
             <v-btn
@@ -185,7 +220,7 @@
     name: 'Server',
 
     data: () => ({
-
+      stampCopied: false,
     }),
 
     computed:{
@@ -193,11 +228,13 @@
         server: 'server/server',
         config: 'server/config',
         clients: 'client/clients',
+        dnscrypt: 'server/dnscrypt',
       }),
     },
 
     mounted () {
       this.readServer()
+      this.readDnscrypt()
     },
 
     methods: {
@@ -205,6 +242,7 @@
         errorServer: 'error',
         readServer: 'read',
         updateServer: 'update',
+        readDnscrypt: 'dnscrypt',
       }),
 
       ...mapActions('client', {
@@ -268,6 +306,15 @@
         link.setAttribute('download', 'wg0.conf') //or any other extension
         document.body.appendChild(link)
         link.click()
+      },
+
+      copyStamp(){
+        if (this.dnscrypt && this.dnscrypt.stamp) {
+          navigator.clipboard.writeText(this.dnscrypt.stamp).then(() => {
+            this.stampCopied = true;
+            setTimeout(() => { this.stampCopied = false; }, 2000);
+          });
+        }
       },
     }
   };

@@ -1,6 +1,11 @@
 package server
 
 import (
+	"bufio"
+	"os"
+	"path/filepath"
+	"strings"
+
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
 	"github.com/vx3r/wg-gen-web/auth"
@@ -19,6 +24,7 @@ func ApplyRoutes(r *gin.RouterGroup) {
 		g.PATCH("", updateServer)
 		g.GET("/config", configServer)
 		g.GET("/version", versionStr)
+		g.GET("/dnscrypt", dnscryptInfo)
 	}
 }
 
@@ -90,5 +96,66 @@ func configServer(c *gin.Context) {
 func versionStr(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"version": version.Version,
+	})
+}
+
+func dnscryptInfo(c *gin.Context) {
+	// Read DNSCrypt provider-info.txt from mounted volume
+	infoPath := filepath.Join(os.Getenv("WG_CONF_DIR"), "dnscrypt", "keys", "provider-info.txt")
+
+	if _, err := os.Stat(infoPath); os.IsNotExist(err) {
+		c.JSON(http.StatusOK, gin.H{
+			"enabled": false,
+		})
+		return
+	}
+
+	file, err := os.Open(infoPath)
+	if err != nil {
+		log.WithFields(log.Fields{"err": err}).Error("failed to open dnscrypt provider-info")
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	defer file.Close()
+
+	var stamp string
+	var providerName string
+	var publicKey string
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.Contains(line, "DNS Stamp:") {
+			stamp = strings.TrimSpace(strings.TrimPrefix(line[strings.Index(line, "DNS Stamp:"):], "DNS Stamp:"))
+			// Remove log prefix if present
+			if idx := strings.Index(stamp, "sdns://"); idx >= 0 {
+				stamp = stamp[idx:]
+			}
+		}
+		if strings.Contains(line, "Provider name:") {
+			providerName = strings.TrimSpace(strings.TrimPrefix(line[strings.Index(line, "Provider name:"):], "Provider name:"))
+			if idx := strings.Index(providerName, "2.dnscrypt-cert."); idx >= 0 {
+				providerName = providerName[idx:]
+			}
+		}
+		if strings.Contains(line, "Provider public key:") {
+			publicKey = strings.TrimSpace(strings.TrimPrefix(line[strings.Index(line, "Provider public key:"):], "Provider public key:"))
+			if idx := strings.Index(publicKey, " "); idx >= 0 {
+				publicKey = publicKey[idx+1:]
+			}
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		log.WithFields(log.Fields{"err": err}).Error("failed to read dnscrypt provider-info")
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"enabled":      stamp != "",
+		"stamp":        stamp,
+		"providerName": providerName,
+		"publicKey":    publicKey,
 	})
 }
